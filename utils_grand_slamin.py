@@ -2,7 +2,6 @@
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import numpy as np
-#%%
 import torch
 from typing import Any, Optional
 from torch import Tensor, nn
@@ -16,7 +15,7 @@ from sklearn.metrics import accuracy_score, roc_auc_score
 from joblib import Parallel, delayed
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from sklearn.metrics import roc_auc_score
-from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR, LinearLR, CosineAnnealingLR, LambdaLR
+from torch.optim.lr_scheduler import MultiStepLR
 import time
 import json
 
@@ -43,7 +42,6 @@ class Grand_slamin(torch.nn.Module):
                   steps_per_epoch: int=1,
                   dense_to_sparse: int=1,
                   type_of_task: str="classification",
-                  sel_penalization_in_hierarchy: int=0,
                   lr_z: float=-1,
                   seed = -1,
                   device = "cpu",
@@ -73,7 +71,6 @@ class Grand_slamin(torch.nn.Module):
             self.test_different_lr = test_different_lr
             self.steps_per_epoch = steps_per_epoch
             self.dense_to_sparse = dense_to_sparse
-            self.sel_penalization_in_hierarchy = sel_penalization_in_hierarchy
 
             self.save_output_models = False
             self.change_output = True
@@ -289,7 +286,6 @@ class Grand_slamin(torch.nn.Module):
                   steps_per_epoch=self.steps_per_epoch,
                   dense_to_sparse=self.dense_to_sparse,
                   type_of_task=self.type_of_task,
-                  sel_penalization_in_hierarchy=self.sel_penalization_in_hierarchy,
                   lr_z=self.lr_z,
                   seed = self.seed,
                   device = self.device,
@@ -806,7 +802,6 @@ def read_model(path_study, ind_repeat, device, steps_per_epoch):
                               steps_per_epoch=steps_per_epoch,
                               dense_to_sparse=dict_params["dense_to_sparse"],
                               type_of_task=dict_params["type_of_task"],
-                              sel_penalization_in_hierarchy=dict_params["sel_penalization_in_hierarchy"],
                               lr_z=dict_params["lr_z"],
                               seed = dict_params["seed"]+ind_repeat,
                               device = device)    
@@ -897,36 +892,17 @@ def tempered_sigmoid(temperature):
         x.sigmoid_()
     return f
 
-def train_grand_slamin(name_study, model, dataset, optimizer, criterion, n_epochs, batch_size_SGD, path_save, test_early_stopping, trial, type_decay="exponential", gamma_lr_decay=np.exp(-np.log(25)/10000), T_max_cos=10, eta_min_cos=1e-5, start_lr_decay=1e-2, end_lr_decay=1e-5, warmup_steps=100, type_of_task = "regression", test_compute_accurate_in_sample_loss = 0, folder_saves = "Saves_grand_slamin", ind_repeat=0, patience=50, metric_early_stopping="val_loss", period_milestones=25):
+def train_grand_slamin(name_study, model, dataset, optimizer, criterion, n_epochs, batch_size_SGD, path_save, test_early_stopping, trial, type_decay="None", gamma_lr_decay=np.exp(-np.log(25)/10000), warmup_steps=100, type_of_task = "regression", test_compute_accurate_in_sample_loss = 0, folder_saves = "Saves_grand_slamin", ind_repeat=0, patience=50, metric_early_stopping="val_loss", period_milestones=25):
       if type_of_task=="regression":
             metric_name = "mse"
       elif type_of_task=="classification":
             metric_name = "accuracy"
       if type_decay!="None":
             print("type_decay diff from None", type_decay)
-            if type_decay=="divergence":
-                  scheduler = ExponentialLR(optimizer, gamma=gamma_lr_decay)
-                  current_min_loss = np.inf
-                  acc_divergence = 0
-            if type_decay=="exponential":
-                  scheduler = ExponentialLR(optimizer, gamma=gamma_lr_decay)
             if type_decay=="multi_lr":
                   n_milesones = n_epochs//period_milestones
                   milestones = period_milestones*np.arange(n_milesones)[1:]
                   scheduler = MultiStepLR(optimizer, milestones=milestones, gamma=gamma_lr_decay)
-            if type_decay=="linear":
-                  scheduler = LinearLR(optimizer, start_factor=start_lr_decay, end_factor=end_lr_decay, total_iters=n_epochs)
-            if type_decay=="cosine":
-                  scheduler = CosineAnnealingLR(optimizer, T_max=T_max_cos, eta_min=eta_min_cos)
-            if type_decay=="ramp":
-                  def warmup(current_step: int):
-                        if current_step < warmup_steps:
-                              # current_step / warmup_steps * base_lr
-                              return float(current_step / warmup_steps)
-                        else:
-                              # (num_training_steps - current_step) / (num_training_steps - warmup_steps) * base_lr
-                              return max(0.0, float(n_epochs - current_step) / float(max(1, n_epochs - warmup_steps)))
-                  scheduler = LambdaLR(optimizer, lr_lambda=warmup)
 
       dataset_train_main, dataset_val_main, dataset_test_main, dataset_train_inter, dataset_val_inter, dataset_test_inter, corres_y_train, corres_y_val, corres_y_test, meta_info = dataset
       if "scaler" in meta_info["Y"]:

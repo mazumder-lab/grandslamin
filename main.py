@@ -55,17 +55,9 @@ parser.add_argument('--temperature', type=float, default = 1.0,
 parser.add_argument('--test_early_stopping', type=int, default = 1,
                     help='If test_early_stopping=1, the best model out of the n_epochs iterations is kept based on the validation loss. If test_early_stopping=1, the training loss is used')
 parser.add_argument('--type_decay', type=str, default = "None",
-                    help='criteria for the decay. If type_decay = "None", then no decay is applied. The other types of decays are "linear", "exponential" and "cosine"')
+                    help='criteria for the decay. Either "None" or "multi_lr". If type_decay = "None", then no decay is applied. If type_decay = "multi_lr", MultiStepLR decay is applied')
 parser.add_argument('--gamma_lr_decay', type=float, default = 0.9,
-                    help='learning rate decay for type_decay = "exponential"')
-parser.add_argument('--T_max_cos', type=int, default = 5,
-                    help='half-period of the cosine for type_decay = "cosine"')
-parser.add_argument('--eta_min_cos', type=float, default = 1.0,
-                    help='minimum learning rate for type_decay = "cosine"')
-parser.add_argument('--start_lr_decay', type=float, default = 1.0,
-                    help='starting learning rate for type_decay = "linear"')
-parser.add_argument('--end_lr_decay', type=float, default = 1.0,
-                    help='ending learning rate for type_decay = "linear"')
+                    help='learning rate decay for type_decay = "multi_lr"')
 parser.add_argument('--warmup_steps', type=int, default = 100,
                     help='epoch where the learning rate reaches its maximum for type_decay = "ramp"')
 parser.add_argument('--path_load_weights', type=str, default = "",
@@ -96,8 +88,6 @@ parser.add_argument('--test_different_lr', type=int, default = 1,
                     help='if set to 1, then lr/steps_per_epoch is used for the weights corresponding to the z_i and z_ij. Otherwise, the regular learning rate is used')
 parser.add_argument('--dense_to_sparse', type=int, default = 1,
                     help='if set to 1, then the weights of the model are eliminated during the training. Currently, only works with Adam, has to be set to 0 for another optimizer.')
-parser.add_argument('--sel_penalization_in_hierarchy', type=int, default = 0,
-                    help='if set to 1, we penalize with alpha the interaction effects when hierarchy = "strong", otherwise no additional effect')
 parser.add_argument('--type_embedding', type=str, default = "one_hot",
                     help='type of embedding for the caterogical variables (one_hot or layer)')
 parser.add_argument('--optimizer_name', type=str, default = "Adam",
@@ -123,10 +113,6 @@ if __name__ == '__main__':
     max_lr = arguments.max_lr
     type_decay = arguments.type_decay
     gamma_lr_decay = arguments.gamma_lr_decay
-    T_max_cos = arguments.T_max_cos
-    eta_min_cos = arguments.eta_min_cos
-    start_lr_decay = arguments.start_lr_decay
-    end_lr_decay = arguments.end_lr_decay
     path_load_weights = arguments.path_load_weights
     type_of_task = arguments.type_of_task
     test_compute_accurate_in_sample_loss = arguments.test_compute_accurate_in_sample_loss
@@ -149,7 +135,6 @@ if __name__ == '__main__':
     metric_best_model = arguments.metric_best_model
     test_different_lr = arguments.test_different_lr
     dense_to_sparse = arguments.dense_to_sparse
-    sel_penalization_in_hierarchy = arguments.sel_penalization_in_hierarchy
     seed = arguments.seed
     lr_z = arguments.lr_z
     type_embedding = arguments.type_embedding
@@ -211,10 +196,6 @@ if __name__ == '__main__':
                                 optimizer_name=optimizer_name, 
                                 type_decay=type_decay,
                                 gamma_lr_decay=gamma_lr_decay,
-                                T_max_cos=T_max_cos,
-                                eta_min_cos=eta_min_cos,
-                                start_lr_decay=start_lr_decay,
-                                end_lr_decay=end_lr_decay,
                                 test_early_stopping=test_early_stopping,
                                 test_compute_accurate_in_sample_loss=test_compute_accurate_in_sample_loss,
                                 n_repeats=n_repeats,
@@ -232,7 +213,6 @@ if __name__ == '__main__':
                                 period_milestones=period_milestones,
                                 alpha=alpha,
                                 test_different_lr=test_different_lr,
-                                sel_penalization_in_hierarchy=sel_penalization_in_hierarchy,
                                 lr_z=lr_z,
                                 type_embedding=type_embedding)
 
@@ -334,7 +314,6 @@ if __name__ == '__main__':
                     steps_per_epoch=steps_per_epoch,
                     dense_to_sparse=dense_to_sparse,
                     type_of_task=type_of_task,
-                    sel_penalization_in_hierarchy=sel_penalization_in_hierarchy,
                     lr_z=lr_z,
                     seed = seed+ind_repeat,
                     device = device,
@@ -355,7 +334,7 @@ if __name__ == '__main__':
                 optimizer = initialize_optimizer(test_different_lr, model, optimizer_name, steps_per_epoch, lr, lr_z)
                 # Training
                 time_before_training = time.time()
-                d_results, best_val_metric, best_model, dict_list = train_grand_slamin(name_study=name_study, model=model, dataset=dataset, optimizer=optimizer, criterion=criterion, n_epochs=n_epochs, batch_size_SGD=batch_size_SGD, path_save=None, test_early_stopping=test_early_stopping, trial=trial, type_decay=type_decay, gamma_lr_decay=gamma_lr_decay, T_max_cos=T_max_cos, eta_min_cos=eta_min_cos, start_lr_decay=start_lr_decay, end_lr_decay=end_lr_decay, warmup_steps=warmup_steps, type_of_task=type_of_task, test_compute_accurate_in_sample_loss=test_compute_accurate_in_sample_loss, folder_saves=folder_saves, ind_repeat=ind_repeat, patience = patience, metric_early_stopping=metric_early_stopping, period_milestones=period_milestones)
+                d_results, best_val_metric, best_model, dict_list = train_grand_slamin(name_study=name_study, model=model, dataset=dataset, optimizer=optimizer, criterion=criterion, n_epochs=n_epochs, batch_size_SGD=batch_size_SGD, path_save=None, test_early_stopping=test_early_stopping, trial=trial, type_decay=type_decay, gamma_lr_decay=gamma_lr_decay, warmup_steps=warmup_steps, type_of_task=type_of_task, test_compute_accurate_in_sample_loss=test_compute_accurate_in_sample_loss, folder_saves=folder_saves, ind_repeat=ind_repeat, patience = patience, metric_early_stopping=metric_early_stopping, period_milestones=period_milestones)
                 if type_of_task == "classification":
                     if metric_best_model == "acc":
                         best_val_metric = best_val_metric[0]

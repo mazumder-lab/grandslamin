@@ -450,20 +450,11 @@ def get_dataset(name_dataset, n_kept_train = -1, device = "cpu", type_scaler = "
             corres_y_val = corres_y_val[None, :]
             corres_y_test = corres_y_test[None, :]
       else:
-            if name_dataset in ["gisette", "madelon"]:
+            if name_dataset in ["madelon"]:
                   data_train = np.loadtxt("../data_classification/"+name_dataset+"/"+name_dataset+"_train.data")
                   data_valid = np.loadtxt("../data_classification/"+name_dataset+"/"+name_dataset+"_valid.data")
                   y_train = np.loadtxt("../data_classification/"+name_dataset+"/"+name_dataset+"_train.labels")
                   y_valid = np.loadtxt("../data_classification/"+name_dataset+"/"+name_dataset+"_valid.labels")
-                  dataset_numpy = np.concatenate([data_train,data_valid])
-                  y_numpy = np.concatenate([y_train,y_valid])
-                  meta_info = {"X" + str(i + 1):{'type':'continuous'} for i in range(dataset_numpy.shape[1])}
-            elif name_dataset in ["dorothea"]:
-                  dico_data = scipy.io.loadmat("../data_classification/dorothea/dorothea.mat")
-                  data_train = dico_data["Xtrain"]
-                  data_valid = dico_data["Xvalid"]
-                  y_train = dico_data["ytrain"][:,0]
-                  y_valid = dico_data["yvalid"][:,0]
                   dataset_numpy = np.concatenate([data_train,data_valid])
                   y_numpy = np.concatenate([y_train,y_valid])
                   meta_info = {"X" + str(i + 1):{'type':'continuous'} for i in range(dataset_numpy.shape[1])}
@@ -512,22 +503,10 @@ def get_dataset(name_dataset, n_kept_train = -1, device = "cpu", type_scaler = "
                   y_numpy[:n_signal] = 1
                   dataset_numpy = dataset.to_numpy()
                   meta_info = {"X" + str(i + 1):{'type':'continuous'} for i in range(dataset_numpy.shape[1])}
-            elif name_dataset in ["qsar"]:
-                  dataset = pd.read_csv("../data_classification/qsar_oral_toxicity.csv", header=None, sep=";")
-                  y_numpy = dataset.iloc[:,-1].to_numpy()
-                  dataset_numpy = dataset.iloc[:,:-1].to_numpy()
-                  meta_info = {"X" + str(i + 1):{'type':'continuous'} for i in range(dataset_numpy.shape[1])}
             elif name_dataset in ["taiwanese"]:
                   dataset = pd.read_csv("../data_classification/taiwanese.csv")
                   y_numpy = dataset.iloc[:,0].to_numpy()
                   dataset_numpy = dataset.iloc[:,1:].to_numpy()
-                  meta_info = {"X" + str(i + 1):{'type':'continuous'} for i in range(dataset_numpy.shape[1])}
-            elif name_dataset in ["liberty"]:
-                  dataset = pd.read_csv("../data_classification/liberty.csv", index_col=0)
-                  dataset = pd.get_dummies(dataset)
-                  y_numpy = dataset.iloc[:,0].to_numpy()
-                  dataset_numpy = dataset.iloc[:,1:].to_numpy()
-                  y_numpy[y_numpy!=0] = 1
                   meta_info = {"X" + str(i + 1):{'type':'continuous'} for i in range(dataset_numpy.shape[1])}
             elif name_dataset in ["adult"]:
                   l_categorical = ["workclass", "education", "marital-status", "occupation", "relationship", "race", "sex", "native-country"]
@@ -588,7 +567,7 @@ def get_dataset(name_dataset, n_kept_train = -1, device = "cpu", type_scaler = "
                   dataset_numpy = dataset_numpy[:n_kept_train]
                   y_numpy = y_numpy[:n_kept_train]
 
-            if name_dataset in ["gisette", "madelon", "dorothea"]:
+            if name_dataset in ["madelon", "dorothea"]:
                   l_ind_train_val = np.arange(y_train.shape[0])
                   l_ind_test = np.arange(y_valid.shape[0])+y_train.shape[0]
                   train_val_dataset_numpy = dataset_numpy[l_ind_train_val]
@@ -674,7 +653,7 @@ def convert_to_small_str(number):
             return str(number)+"e-"+str(power_of_ten)
       return str(number)
 
-def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epochs=10000, temperature=1.0, batch_size_SGD=64, n_train_kept=500, optimizer_name="SGD", type_decay=None, gamma_lr_decay=None, T_max_cos=None, eta_min_cos=None, start_lr_decay=None, end_lr_decay=None, test_early_stopping=0, test_compute_accurate_in_sample_loss = 0, n_repeats = 3, warmup_steps=100, n_features_kept=-1, type_scaler="std", patience=50, gamma=1.0, selection_reg=0.1, entropy_reg=0.01, hierarchy="none", l2_reg = 0, metric_early_stopping="val_loss", max_interaction_number=-1, period_milestones=25, alpha=1.0, test_different_lr=0, sel_penalization_in_hierarchy="none", lr_z=-1, type_embedding=""):
+def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epochs=10000, temperature=1.0, batch_size_SGD=64, n_train_kept=500, optimizer_name="SGD", type_decay=None, gamma_lr_decay=None, test_early_stopping=0, test_compute_accurate_in_sample_loss = 0, n_repeats = 3, warmup_steps=100, n_features_kept=-1, type_scaler="std", patience=50, gamma=1.0, selection_reg=0.1, entropy_reg=0.01, hierarchy="none", l2_reg = 0, metric_early_stopping="val_loss", max_interaction_number=-1, period_milestones=25, alpha=1.0, test_different_lr=0, lr_z=-1, type_embedding=""):
     name_study = "soft_add_depth_"+convert_to_small_str(depth)+"_T_"+convert_to_small_str(temperature)+"_trees_"+convert_to_small_str(n_trees)
     if optimizer_name!="Adam":
           name_study+="_"+optimizer_name
@@ -693,16 +672,8 @@ def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epoch
         name_study+="_n_epochs_"+convert_to_small_str(n_epochs)
     if (type_decay!="None"):
         name_study+="_"+type_decay
-        if type_decay=="linear":
-                name_study+="_linear_start_"+convert_to_small_str(start_lr_decay)+"_end_"+convert_to_small_str(end_lr_decay)
-        elif type_decay=="exponential":
-                name_study+="_"+convert_to_small_str(gamma_lr_decay)
-        elif type_decay=="cosine":
-                name_study+="_T_max_"+convert_to_small_str(T_max_cos)+"_min_lr_"+convert_to_small_str(eta_min_cos)
-        elif type_decay=="multi_lr":
+        if type_decay=="multi_lr":
                 name_study+="_p_"+convert_to_small_str(period_milestones)+"_g_"+convert_to_small_str(gamma_lr_decay)
-        elif type_decay=="ramp":
-                name_study+="_"+convert_to_small_str(warmup_steps)
     if test_early_stopping:
         name_study+="_es"
         if patience!=-1:
@@ -723,8 +694,6 @@ def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epoch
         name_study+="_diff_lr"
         if lr_z!=-1:
             name_study+="_"+convert_to_small_str(lr_z)
-    if sel_penalization_in_hierarchy and hierarchy in ["strong", "weak"]:
-        name_study+="_sel_reg_hier"
     if n_repeats!=1:
         name_study+="_"+convert_to_small_str(n_repeats)
     return name_study
