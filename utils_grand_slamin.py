@@ -9,7 +9,7 @@ from torch import Tensor, nn
 from torch.nn.parameter import Parameter
 import copy
 import math
-from utils_inits_pytorch_geom import *
+from utils_inits import *
 import optuna
 import itertools
 from sklearn.metrics import accuracy_score, roc_auc_score
@@ -33,19 +33,18 @@ class Grand_slamin(torch.nn.Module):
                   n_features_kept: int = -1,
                   weight_initializer: Optional[str] = None,
                   bias_initializer: Optional[str] = None,
-                  hierarchy: int = 0,
+                  hierarchy: str = "none",
                   gamma: float = 1.0,
                   alpha: float = 1.0,
                   selection_reg: float = 0.1,
                   entropy_reg: float = 0.001,
                   l2_reg: float = 0.0001,
-                  group_l1_reg: float = 0.0,
                   test_different_lr: int = 0,
                   steps_per_epoch: int=1,
                   dense_to_sparse: int=1,
                   type_of_task: str="classification",
                   sel_penalization_in_hierarchy: int=0,
-                  val_second_lr: float=-1,
+                  lr_z: float=-1,
                   seed = -1,
                   device = "cpu",
                   meta_info = None):
@@ -63,7 +62,7 @@ class Grand_slamin(torch.nn.Module):
             self.n_features_kept = n_features_kept
             self.type_of_task = type_of_task
             self.seed = seed
-            self.val_second_lr = val_second_lr
+            self.lr_z = lr_z
             
             self.hierarchy = hierarchy
             self.gamma = gamma
@@ -71,7 +70,6 @@ class Grand_slamin(torch.nn.Module):
             self.selection_reg = selection_reg
             self.entropy_reg = entropy_reg
             self.l2_reg = l2_reg
-            self.group_l1_reg = group_l1_reg
             self.test_different_lr = test_different_lr
             self.steps_per_epoch = steps_per_epoch
             self.dense_to_sparse = dense_to_sparse
@@ -206,11 +204,11 @@ class Grand_slamin(torch.nn.Module):
                   data_numpy_val = data_numpy_val[0].numpy()
                   y_numpy_val = y_numpy_val[0].numpy()
                   if self.type_of_task=="regression":
-                        l_mse = Parallel(n_jobs=16, verbose=1)(delayed(get_mse_combinations)(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, self.seed) for idx_combination in range(len(l_combinations)))
+                        l_mse = Parallel(n_jobs=16, verbose=1)(delayed(compute_marginal_screening_regression)(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, self.seed) for idx_combination in range(len(l_combinations)))
                         l_mse = np.array(l_mse)
                         l_combinations = l_combinations[np.argsort(l_mse)][:max_interaction_number]
                   elif self.type_of_task == "classification":
-                        l_auc = Parallel(n_jobs=16, verbose=1)(delayed(get_auc_combinations)(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, self.seed) for idx_combination in range(len(l_combinations)))
+                        l_auc = Parallel(n_jobs=16, verbose=1)(delayed(compute_marginal_screening_classification)(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, self.seed) for idx_combination in range(len(l_combinations)))
                         l_auc = np.array(l_auc)
                         l_combinations = l_combinations[np.argsort(-l_auc)][:max_interaction_number]
 
@@ -287,13 +285,12 @@ class Grand_slamin(torch.nn.Module):
                   selection_reg=self.selection_reg,
                   entropy_reg=self.entropy_reg,
                   l2_reg=self.l2_reg,
-                  group_l1_reg=self.group_l1_reg,
                   test_different_lr=self.test_different_lr,
                   steps_per_epoch=self.steps_per_epoch,
                   dense_to_sparse=self.dense_to_sparse,
                   type_of_task=self.type_of_task,
                   sel_penalization_in_hierarchy=self.sel_penalization_in_hierarchy,
-                  val_second_lr=self.val_second_lr,
+                  lr_z=self.lr_z,
                   seed = self.seed,
                   device = self.device,
                   meta_info=self.meta_info)
@@ -415,20 +412,10 @@ class Grand_slamin(torch.nn.Module):
                   l2_loss_main = torch.tensor(0)
                   l2_loss_inter = torch.tensor(0)
             
-            if self.group_l1_reg !=0:
-                  group_l1_loss_main = torch.sum(self.weight_output_main**2, dim = [i for i in range(1,len(self.weight_output_main.shape))])
-                  group_l1_loss_inter = torch.sum(self.weight_output_inter**2, dim=[i for i in range(1, len(self.weight_output_inter.shape))])
-                  group_l1_loss_main = self.group_l1_reg * torch.sum(torch.sqrt(group_l1_loss_main))
-                  group_l1_loss_inter = self.group_l1_reg * torch.sum(torch.sqrt(group_l1_loss_inter))
-            else:
-                  group_l1_loss_main = torch.tensor(0)
-                  group_l1_loss_inter = torch.tensor(0)
-
             entropy_loss = entropy_loss_main + entropy_loss_inter
             selection_loss = selection_loss_main + self.alpha * selection_loss_inter
             l2_loss = l2_loss_main + l2_loss_inter
-            group_l1_loss = group_l1_loss_main + group_l1_loss_inter
-            return entropy_loss, selection_loss, l2_loss, group_l1_loss
+            return entropy_loss, selection_loss, l2_loss
 
       def get_n_z(self):
             if self.dense_to_sparse:
@@ -511,7 +498,7 @@ class Grand_slamin(torch.nn.Module):
             if test_pruned:
                   self.update_indice_param()
                   optimizer_name = optimizer.__class__.__name__
-                  copy_optimizer = initialize_optimizer(self.test_different_lr, self, optimizer_name, self.steps_per_epoch, optimizer.defaults["lr"], self.val_second_lr)
+                  copy_optimizer = initialize_optimizer(self.test_different_lr, self, optimizer_name, self.steps_per_epoch, optimizer.defaults["lr"], self.lr_z)
                   try:
                         copy_optimizer._step_count = optimizer._step_count
                   except:
@@ -555,17 +542,17 @@ class Grand_slamin(torch.nn.Module):
                   l_inf_weight_inter = torch.abs(self.weight_output_inter).norm(p=float("inf"), dim=[i for i in range(1,len(self.weight_output_inter.shape))])
                   condition_to_prune_main = self.z_main.detach()
                   condition_to_prune_inter = self.q_inter.detach()
-                  if self.hierarchy==0 and torch.min(condition_to_prune_main) == 0:
+                  if self.hierarchy=="none" and torch.min(condition_to_prune_main) == 0:
                         idx_remove_main = torch.where(condition_to_prune_main==0)[0]
                         self.weight_z_main.data[idx_remove_main] = -self.gamma
                         self.z_main.data[idx_remove_main] = 0
 
-                  if self.hierarchy==0 and torch.min(condition_to_prune_inter) == 0:
+                  if self.hierarchy=="none" and torch.min(condition_to_prune_inter) == 0:
                         idx_remove_inter = torch.where(condition_to_prune_inter==0)[0]
                         self.weight_z_inter.data[idx_remove_inter] = -self.gamma
                         self.z_inter.data[idx_remove_inter] = 0
 
-                  if self.hierarchy in [1,2] and torch.min(condition_to_prune_main) == 0:
+                  if self.hierarchy in ["strong", "weak"] and torch.min(condition_to_prune_main) == 0:
                         idx_remove_main = torch.where(condition_to_prune_main==0)[0]
                         self.weight_z_main.data[idx_remove_main] = -self.gamma
                         self.z_main.data[idx_remove_main] = 0
@@ -699,9 +686,9 @@ class Grand_slamin(torch.nn.Module):
                   print("Cuda memory forward 12:", torch.cuda.memory_allocated("cuda"))
             z_inter = torch.where(condition_1_inter, torch.zeros_like(self.weight_z_inter), 
                               torch.where(condition_2_inter, torch.ones_like(self.weight_z_inter), smooth_zs_inter))
-            if self.hierarchy == 0:
+            if self.hierarchy == "none":
                   q_inter = z_inter
-            elif self.hierarchy==1:
+            elif self.hierarchy == "strong":
                   if len(self.l_main)>0:
                         n_main_max = torch.max(self.l_main)+1
                   else:
@@ -714,7 +701,7 @@ class Grand_slamin(torch.nn.Module):
                   z_main_copy[self.l_main] = z_main
                   z_prod = torch.prod(z_main_copy[self.l_combinations], 1)
                   q_inter = z_inter*z_prod
-            elif self.hierarchy==2:
+            elif self.hierarchy=="weak":
                   if len(self.l_main)>0:
                         n_main_max = torch.max(self.l_main)+1
                   else:
@@ -789,10 +776,8 @@ def read_model(path_study, ind_repeat, device, steps_per_epoch):
     with open(path_params, "r") as f:
         dict_params = json.load(f)
 
-    if "group_l1_reg" not in dict_params:
-        dict_params["group_l1_reg"] = 0.0
-    if "val_second_lr" not in dict_params:
-        dict_params["val_second_lr"] = -1
+    if "lr_z" not in dict_params:
+        dict_params["lr_z"] = -1
 
     weight_model = torch.load(path_model, map_location=device)
     l_main = weight_model["l_main"]
@@ -817,13 +802,12 @@ def read_model(path_study, ind_repeat, device, steps_per_epoch):
                               selection_reg = dict_params["selection_reg"],
                               entropy_reg = dict_params["entropy_reg"],
                               l2_reg=dict_params["l2_reg"],
-                              group_l1_reg=dict_params["group_l1_reg"],
                               test_different_lr=dict_params["test_different_lr"],
                               steps_per_epoch=steps_per_epoch,
                               dense_to_sparse=dict_params["dense_to_sparse"],
                               type_of_task=dict_params["type_of_task"],
                               sel_penalization_in_hierarchy=dict_params["sel_penalization_in_hierarchy"],
-                              val_second_lr=dict_params["val_second_lr"],
+                              lr_z=dict_params["lr_z"],
                               seed = dict_params["seed"]+ind_repeat,
                               device = device)    
     model.l_combinations = weight_model["l_combinations"]
@@ -857,7 +841,7 @@ class Dataset_grand_slamin(torch.utils.data.Dataset):
 # --- Metrics ---
 # ---------------
 
-def get_auc_combinations(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, seed):
+def compute_marginal_screening_classification(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, seed):
     if seed==-1:
           model = DecisionTreeClassifier(max_depth=3)
     else:
@@ -868,7 +852,7 @@ def get_auc_combinations(data_numpy_train, y_numpy_train, data_numpy_val, y_nump
     auc = compute_auc(y_numpy_val, pred)
     return auc
 
-def get_mse_combinations(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, seed):
+def compute_marginal_screening_regression(data_numpy_train, y_numpy_train, data_numpy_val, y_numpy_val, l_combinations, idx_combination, seed):
     if seed==-1:
           model = DecisionTreeRegressor(max_depth=3)
     else:
@@ -882,7 +866,7 @@ def get_mse_combinations(data_numpy_train, y_numpy_train, data_numpy_val, y_nump
 # --- Optimizer ---
 # -----------------
 
-def initialize_optimizer(test_different_lr, model, optimizer_name, steps_per_epoch, lr, val_second_lr):
+def initialize_optimizer(test_different_lr, model, optimizer_name, steps_per_epoch, lr, lr_z):
       optimizer_func = getattr(torch.optim, optimizer_name)
       dict_params = dict(model.named_parameters())
       if test_different_lr:
@@ -893,9 +877,9 @@ def initialize_optimizer(test_different_lr, model, optimizer_name, steps_per_epo
             for i in range(len(model.d_diff)):
                   l_params_modified_lr.append(dict_params[model.d_diff[i]])
             
-            if val_second_lr== -1:
-                  val_second_lr = lr/steps_per_epoch
-            optimizer = optimizer_func([{"params":l_params_regular_lr}, {"params":l_params_modified_lr, "lr":val_second_lr}], lr = lr)
+            if lr_z== -1:
+                  lr_z = lr/steps_per_epoch
+            optimizer = optimizer_func([{"params":l_params_regular_lr}, {"params":l_params_modified_lr, "lr":lr_z}], lr = lr)
       else:
             l_params_regular_lr = []
             for i in range(len(model.d_regular)):
@@ -994,8 +978,8 @@ def train_grand_slamin(name_study, model, dataset, optimizer, criterion, n_epoch
                         elif type_of_task == "classification":
                               loss = criterion(output, batch_sgd[1])
                         loss_pred_in_sample += n_batch*loss.detach().item()
-                        entropy_loss, selection_loss, l2_loss, group_l1_loss = model.get_losses()
-                        loss += entropy_loss + selection_loss + l2_loss + group_l1_loss
+                        entropy_loss, selection_loss, l2_loss = model.get_losses()
+                        loss += entropy_loss + selection_loss + l2_loss
                         loss_pred_total += n_batch*loss.detach().item()
                         loss.backward()  # Derive gradients.
                         optimizer.step()  # Update parameters based on gradients.
@@ -1055,8 +1039,8 @@ def train_grand_slamin(name_study, model, dataset, optimizer, criterion, n_epoch
                               mse_train = mse_train.cpu()
                         except:
                               pass
-                        entropy_loss, selection_loss, l2_loss, group_l1_loss = model.get_losses()
-                        mse_train += entropy_loss.detach().item() + selection_loss.detach().item() + l2_loss.detach().item() + group_l1_loss.detach().item()
+                        entropy_loss, selection_loss, l2_loss = model.get_losses()
+                        mse_train += entropy_loss.detach().item() + selection_loss.detach().item() + l2_loss.detach().item()
                   elif type_of_task == "classification":
                         if len(out.shape)>=2:
                               acc_train = torch.mean((torch.argmax(out.detach(), dim=1)==corres_y_train).float())*100
@@ -1079,12 +1063,12 @@ def train_grand_slamin(name_study, model, dataset, optimizer, criterion, n_epoch
                   if test_compute_accurate_in_sample_loss or not(test_early_stopping):
                         model.eval()
                         out = model((dataset_train_main,dataset_train_inter))
-                        entropy_loss, selection_loss, l2_loss, group_l1_loss = model.get_losses()
+                        entropy_loss, selection_loss, l2_loss = model.get_losses()
                         if type_of_task == "regression":
                               train_loss = criterion(out.detach(), corres_y_train).item()
                         elif type_of_task == "classification":
                               train_loss = criterion(out.detach(), corres_y_train).item()
-                        train_loss += entropy_loss.detach().item() + selection_loss.detach().item() + l2_loss.detach().item() + group_l1_loss.detach().item()
+                        train_loss += entropy_loss.detach().item() + selection_loss.detach().item() + l2_loss.detach().item()
 
                   if test_early_stopping:
                         if (type_of_task=="regression"):
@@ -1284,7 +1268,7 @@ def evaluate_grand_slamin(model, dataset, type_of_task, scaler_y=None):
 # --- Visualization ---
 # ---------------------
 
-def purify_model(model, X_main, interaction_terms, active_interaction_terms):
+def purify_model_for_visualization(model, X_main, interaction_terms, active_interaction_terms):
     l_main = model.l_main
     l_combinations = model.l_combinations
     l_combinations_idx = model.l_combinations_idx

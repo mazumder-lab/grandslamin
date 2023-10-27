@@ -42,8 +42,8 @@ parser.add_argument('--seed', type=int, default = 0,
                     help='seed for the training')
 parser.add_argument('--batch_size_SGD', type=int, default = 64,
                     help='batch size for SGD')
-parser.add_argument('--hierarchy', type=int, default = 0,
-                    help='2 for weak hierarchy, 1 if strong hierarchy is used, 0 for no hierarchy')
+parser.add_argument('--hierarchy', type=str, default = "none",
+                    help='"weak" for weak hierarchy, "strong" for strong hierarchy, "none" for no hierarchy')
 parser.add_argument('--depth', type=int, default = 4,
                     help='depth for grand_slamin')
 parser.add_argument('--lr_z', type=float, default = -1,
@@ -90,8 +90,6 @@ parser.add_argument('--metric_early_stopping', type=str, default = "val_loss",
                     help='either val_loss or val_accuracy')
 parser.add_argument('--l2_reg', type=float, default = 0.001,
                     help='regularizer factor for l2 penalization in Grand Slamin')
-parser.add_argument('--group_l1_reg', type=float, default = 0.0,
-                    help='regularizer factor for l1 penalization in Grand Slamin')
 parser.add_argument('--period_milestones', type=int, default = 25,
                     help='period of the milestones for multi_lr scheduler')
 parser.add_argument('--test_different_lr', type=int, default = 1,
@@ -99,7 +97,7 @@ parser.add_argument('--test_different_lr', type=int, default = 1,
 parser.add_argument('--dense_to_sparse', type=int, default = 1,
                     help='if set to 1, then the weights of the model are eliminated during the training. Currently, only works with Adam, has to be set to 0 for another optimizer.')
 parser.add_argument('--sel_penalization_in_hierarchy', type=int, default = 0,
-                    help='if set to 1, we penalize with alpha the interaction effects when hierarchy = 1, otherwise no additional effect')
+                    help='if set to 1, we penalize with alpha the interaction effects when hierarchy = "strong", otherwise no additional effect')
 parser.add_argument('--type_embedding', type=str, default = "one_hot",
                     help='type of embedding for the caterogical variables (one_hot or layer)')
 parser.add_argument('--optimizer_name', type=str, default = "Adam",
@@ -145,7 +143,6 @@ if __name__ == '__main__':
     selection_reg = arguments.selection_reg
     alpha = arguments.alpha
     l2_reg = arguments.l2_reg
-    group_l1_reg = arguments.group_l1_reg
     metric_early_stopping = arguments.metric_early_stopping
     device = arguments.device
     period_milestones = arguments.period_milestones
@@ -230,7 +227,6 @@ if __name__ == '__main__':
                                 entropy_reg=entropy_reg,
                                 hierarchy=hierarchy,
                                 l2_reg=l2_reg,
-                                group_l1_reg=group_l1_reg,
                                 metric_early_stopping=metric_early_stopping,
                                 max_interaction_number=max_interaction_number,
                                 period_milestones=period_milestones,
@@ -319,31 +315,30 @@ if __name__ == '__main__':
                     criterion = torch.nn.MSELoss().to(device)
                 # Model initialization
                 model = Grand_slamin(n_trees=n_trees, 
-                                                        n_main=n_main, 
-                                                        n_interactions=n_interactions, 
-                                                        depth=depth, 
-                                                        bias=bias,
-                                                        activation_func=activation_func, 
-                                                        p_output=p_output,
-                                                        n_features_kept = n_features_kept,
-                                                        weight_initializer = "glorot",
-                                                        bias_initializer = "zeros",
-                                                        hierarchy = hierarchy,
-                                                        gamma = gamma,
-                                                        alpha=alpha,
-                                                        selection_reg = selection_reg,
-                                                        entropy_reg=entropy_reg,
-                                                        l2_reg=l2_reg,
-                                                        group_l1_reg=group_l1_reg,
-                                                        test_different_lr=test_different_lr,
-                                                        steps_per_epoch=steps_per_epoch,
-                                                        dense_to_sparse=dense_to_sparse,
-                                                        type_of_task=type_of_task,
-                                                        sel_penalization_in_hierarchy=sel_penalization_in_hierarchy,
-                                                        lr_z=lr_z,
-                                                        seed = seed+ind_repeat,
-                                                        device = device,
-                                                        meta_info=meta_info)
+                    n_main=n_main, 
+                    n_interactions=n_interactions, 
+                    depth=depth, 
+                    bias=bias,
+                    activation_func=activation_func, 
+                    p_output=p_output,
+                    n_features_kept = n_features_kept,
+                    weight_initializer = "glorot",
+                    bias_initializer = "zeros",
+                    hierarchy = hierarchy,
+                    gamma = gamma,
+                    alpha=alpha,
+                    selection_reg = selection_reg,
+                    entropy_reg=entropy_reg,
+                    l2_reg=l2_reg,
+                    test_different_lr=test_different_lr,
+                    steps_per_epoch=steps_per_epoch,
+                    dense_to_sparse=dense_to_sparse,
+                    type_of_task=type_of_task,
+                    sel_penalization_in_hierarchy=sel_penalization_in_hierarchy,
+                    lr_z=lr_z,
+                    seed = seed+ind_repeat,
+                    device = device,
+                    meta_info=meta_info)
                 dataset_train_main, dataset_val_main, dataset_test_main, dataset_train_inter, dataset_val_inter, dataset_test_inter, corres_y_train, corres_y_val, corres_y_test, meta_info = model.perform_screening(dataset_temp, max_interaction_number)
                 dataset = (dataset_train_main, dataset_val_main, dataset_test_main, dataset_train_inter, dataset_val_inter, dataset_test_inter, corres_y_train, corres_y_val, corres_y_test, meta_info)
                 if path_load_weights!="":

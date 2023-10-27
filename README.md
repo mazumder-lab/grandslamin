@@ -21,9 +21,9 @@ tqdm==4.65.0
 ## Structure of the repo
 Scripts for the experiments (name, finetuning, etc) are located in `utils.py`. Scripts for the GRAND-SLAMIN implementation are located in `utils_grand_slamin.py`.
 To start traning a GRAND-SLAMIN model, you can run `main.py` specifying the hyperparameters you want as arguments. For example:
-- `python main.py --name_dataset online --lr 0.005 --n_epochs 1000 --hierarchy 1 --folder_saves Saves_grand_slamin --entropy_reg 0.01 --selection_reg 0.0002154434690031 --alpha 10.0 --l2_reg 0.0`
-- `python main.py --name_dataset optdigits --hierarchy 2 --lr 0.01 --n_epochs 1000 --hierarchy 1 --folder_saves Saves_grand_slamin --entropy_reg 0.1 --selection_reg 4.641588833612772e-05 --l2_reg 1e-05`
-- `python main.py --name_dataset mfeat --max_interaction_number 20000  --n_epochs 2000 --patience 500 --hierarchy 0 --metric_early_stopping val_accuracy --folder_saves Saves_grand_slamin --lr 5e-5 --gamma 0.1 --entropy_reg 0.1 --selection_reg 0.0 --lr_z 0.0005`
+- `python main.py --name_dataset online --lr 0.005 --n_epochs 1000 --hierarchy strong --folder_saves Saves_grand_slamin --entropy_reg 0.01 --selection_reg 0.0002154434690031 --alpha 10.0 --l2_reg 0.0`
+- `python main.py --name_dataset optdigits --hierarchy weak --lr 0.01 --n_epochs 1000 --folder_saves Saves_grand_slamin --entropy_reg 0.1 --selection_reg 4.641588833612772e-05 --l2_reg 1e-05`
+- `python main.py --name_dataset mfeat --max_interaction_number 20000  --n_epochs 2000 --patience 500 --hierarchy none --metric_early_stopping val_accuracy --folder_saves Saves_grand_slamin --lr 5e-5 --gamma 0.1 --entropy_reg 0.1 --selection_reg 0.0 --lr_z 0.0005`
 
 To visualize the main effects of a GRAND-SLAMIN model, you can run `visualize_main_effects.py` (you can specify the path of the model(s) you want to visualize in the script).
 

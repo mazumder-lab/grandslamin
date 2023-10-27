@@ -7,11 +7,11 @@ import plotly.graph_objs as go
 
 folder_visualizations = "visualize_main_effects"
 
-path_hierarchy_0 = "Saves_grand_slamin_bikesharing_repeats_temp/study_soft_add_depth_4_T_1_trees_1_lr_0.01_64_bikesharing_std_multi_lr_p_25_g_0.9_es_patience_50_val_loss_gamma_1_sel_reg_1.0e-4_ent_reg_0.1_l2_reg_1e-05_hier_0_main_-1_inter-1_diff_lr_10"
-path_hierarchy_1 = "Saves_grand_slamin_bikesharing_repeats_temp/study_soft_add_depth_4_T_1_trees_1_lr_0.01_64_bikesharing_std_multi_lr_p_25_g_0.9_es_patience_50_val_loss_gamma_1_sel_reg_1.0e-4_ent_reg_0.1_l2_reg_1e-05_hier_1_main_-1_inter-1_diff_lr_10"
-path_hierarchy_2 = "Saves_grand_slamin_bikesharing_repeats_temp/study_soft_add_depth_4_T_1_trees_1_lr_0.01_64_bikesharing_std_multi_lr_p_25_g_0.9_es_patience_50_val_loss_gamma_1_sel_reg_1.0e-4_ent_reg_0.1_l2_reg_1e-05_hier_2_main_-1_inter-1_diff_lr_10"
+path_hierarchy_none = "Saves_grand_slamin_bikesharing_repeats_temp/study_soft_add_depth_4_T_1_trees_1_lr_0.01_64_bikesharing_std_multi_lr_p_25_g_0.9_es_patience_50_val_loss_gamma_1_sel_reg_1.0e-4_ent_reg_0.1_l2_reg_1e-05_hier_0_main_-1_inter-1_diff_lr_10"
+path_hierarchy_strong = "Saves_grand_slamin_bikesharing_repeats_temp/study_soft_add_depth_4_T_1_trees_1_lr_0.01_64_bikesharing_std_multi_lr_p_25_g_0.9_es_patience_50_val_loss_gamma_1_sel_reg_1.0e-4_ent_reg_0.1_l2_reg_1e-05_hier_1_main_-1_inter-1_diff_lr_10"
+path_hierarchy_weak = "Saves_grand_slamin_bikesharing_repeats_temp/study_soft_add_depth_4_T_1_trees_1_lr_0.01_64_bikesharing_std_multi_lr_p_25_g_0.9_es_patience_50_val_loss_gamma_1_sel_reg_1.0e-4_ent_reg_0.1_l2_reg_1e-05_hier_2_main_-1_inter-1_diff_lr_10"
 
-path_saves = [path_hierarchy_0, path_hierarchy_1, path_hierarchy_2]
+path_saves = [path_hierarchy_none, path_hierarchy_strong, path_hierarchy_weak]
 
 readable_labels = {
      0  : "season",
@@ -52,7 +52,7 @@ d_plots_inter = {}
 if not(os.path.exists(folder_visualizations)):
     os.mkdir(folder_visualizations)
 
-for hierarchy in [0,1,2]:
+for hierarchy in ["none", "strong", "weak"]:
     print("Computating graph for hierarchy =", hierarchy)
     path_study = path_saves[hierarchy]
     device = "cpu"
@@ -91,7 +91,7 @@ for hierarchy in [0,1,2]:
     for ind_repeat in range(n_repeats):
         model = read_model(path_study, ind_repeat, device, steps_per_epoch)
         active_interaction_terms = [tuple(model.l_combinations[i].numpy()) for i in range(len(model.l_combinations))]
-        fmain, finteraction, X_main, X_interaction = purify_model(model, X_main, interaction_terms, active_interaction_terms)
+        fmain, finteraction, X_main, X_interaction = purify_model_for_visualization(model, X_main, interaction_terms, active_interaction_terms)
         for i in range(n_main_original):
             fmain_final[i] = np.concatenate([fmain_final[i], fmain[i][np.newaxis]])
         for term in interaction_terms:
@@ -112,7 +112,7 @@ for hierarchy in [0,1,2]:
 for i in range(n_main_original):
     min_val_y = np.inf
     max_val_y = -np.inf
-    for hierarchy in [0,1,2]:
+    for hierarchy in ["none", "strong", "weak"]:
         x_scaled, mean_output, mad_ouput = d_plots_main[(i,hierarchy)]
         min_val_y = min(min_val_y, np.min(mean_output-mad_ouput))
         max_val_y = max(max_val_y, np.max(mean_output+mad_ouput))
@@ -120,7 +120,7 @@ for i in range(n_main_original):
     max_val_y += 0.1*range_length
     min_val_y -= 0.1*range_length
     print(readable_labels[i], min_val_y, max_val_y)
-    for hierarchy in [0,1,2]:
+    for hierarchy in ["none", "strong", "weak"]:
         fig = go.Figure(layout_yaxis_range = [min_val_y, max_val_y])
         x_scaled, mean_output, mad_ouput = d_plots_main[(i,hierarchy)]
 

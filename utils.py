@@ -674,7 +674,7 @@ def convert_to_small_str(number):
             return str(number)+"e-"+str(power_of_ten)
       return str(number)
 
-def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epochs=10000, temperature=1.0, batch_size_SGD=64, n_train_kept=500, optimizer_name="SGD", type_decay=None, gamma_lr_decay=None, T_max_cos=None, eta_min_cos=None, start_lr_decay=None, end_lr_decay=None, test_early_stopping=0, test_compute_accurate_in_sample_loss = 0, n_repeats = 3, warmup_steps=100, n_features_kept=-1, type_scaler="std", patience=50, gamma=1.0, selection_reg=0.1, entropy_reg=0.01, hierarchy=0, l2_reg = 0, group_l1_reg = 0, metric_early_stopping="val_loss", max_interaction_number=-1, period_milestones=25, alpha=1.0, test_different_lr=0, sel_penalization_in_hierarchy=0, val_second_lr=-1, type_embedding=""):
+def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epochs=10000, temperature=1.0, batch_size_SGD=64, n_train_kept=500, optimizer_name="SGD", type_decay=None, gamma_lr_decay=None, T_max_cos=None, eta_min_cos=None, start_lr_decay=None, end_lr_decay=None, test_early_stopping=0, test_compute_accurate_in_sample_loss = 0, n_repeats = 3, warmup_steps=100, n_features_kept=-1, type_scaler="std", patience=50, gamma=1.0, selection_reg=0.1, entropy_reg=0.01, hierarchy="none", l2_reg = 0, metric_early_stopping="val_loss", max_interaction_number=-1, period_milestones=25, alpha=1.0, test_different_lr=0, sel_penalization_in_hierarchy="none", lr_z=-1, type_embedding=""):
     name_study = "soft_add_depth_"+convert_to_small_str(depth)+"_T_"+convert_to_small_str(temperature)+"_trees_"+convert_to_small_str(n_trees)
     if optimizer_name!="Adam":
           name_study+="_"+optimizer_name
@@ -715,17 +715,15 @@ def get_name_study(lr=-1, name_dataset="spambase", depth="7", n_trees=3, n_epoch
     name_study+="_sel_reg_"+convert_to_small_str(selection_reg)
     name_study+="_ent_reg_"+convert_to_small_str(entropy_reg)
     name_study+="_l2_reg_"+convert_to_small_str(l2_reg)
-    if group_l1_reg!=0:
-      name_study+="_group_l1_reg_"+convert_to_small_str(group_l1_reg)
     if alpha!=1.0:
       name_study+="_alp_"+convert_to_small_str(alpha)
-    name_study+="_hier_"+convert_to_small_str(hierarchy)
+    name_study+="_hier_"+hierarchy
     name_study+="_inter"+convert_to_small_str(max_interaction_number)
     if test_different_lr!=0:
         name_study+="_diff_lr"
-        if val_second_lr!=-1:
-            name_study+="_"+convert_to_small_str(val_second_lr)
-    if sel_penalization_in_hierarchy and hierarchy in [1, 2]:
+        if lr_z!=-1:
+            name_study+="_"+convert_to_small_str(lr_z)
+    if sel_penalization_in_hierarchy and hierarchy in ["strong", "weak"]:
         name_study+="_sel_reg_hier"
     if n_repeats!=1:
         name_study+="_"+convert_to_small_str(n_repeats)
