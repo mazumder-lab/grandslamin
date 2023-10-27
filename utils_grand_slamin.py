@@ -20,8 +20,6 @@ from torch.optim.lr_scheduler import ExponentialLR, MultiStepLR, LinearLR, Cosin
 import time
 import json
 
-# https://www.kaggle.com/competitions/cs419m/data
-
 # --------------------------
 # --- Model Grand Slamin ---
 # --------------------------
